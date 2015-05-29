@@ -860,20 +860,20 @@ add_block(ospfs_inode_t *oi)
 		
 		// oi indir2 exists at this point
 		uint32_t* ind2_arr = ospfs_block(oi->oi_indirect2);
-		ind2_num = indir_index(n);
+		uint32_t ind2_num = indir_index(n);
 
-		ind_num = (n - OSPFS_NDIRECT) % OSPFS_NINDIRECT;
+		uint32_t ind_num = (n - OSPFS_NDIRECT) % OSPFS_NINDIRECT;
 
 		if (ind_num == 0)
 		{	// need new indirect block
 			if (!(allocated[1] = allocate_block()))
 			{
-				free_block(allocate[0]);
+				free_block(allocated[0]);
 				return -ENOSPC;
 			}
 
-			memset(ospfs_block(allocate[1]), 0, OSPFS_BLKSIZE);
-			ind2_arr[ind2_num] = allocate[1];
+			memset(ospfs_block(allocated[1]), 0, OSPFS_BLKSIZE);
+			ind2_arr[ind2_num] = allocated[1];
 		}
 
 		uint32_t* ind_arr = ospfs_block(ind2_arr[ind2_num]);
@@ -881,9 +881,9 @@ add_block(ospfs_inode_t *oi)
 		uint32_t newblock = allocate_block();
 		if (newblock == 0)
 		{
-			free_block(allocate[0]);
-			if (allocate[1] != 0)
-				free_block(allocate[1]);
+			free_block(allocated[0]);
+			if (allocated[1] != 0)
+				free_block(allocated[1]);
 			return -ENOSPC;
 		}
 
@@ -1043,7 +1043,10 @@ change_size(ospfs_inode_t *oi, uint32_t new_size)
 		if (r == -EIO)
 			return -EIO;
 		if (r == -ENOSPC)
+		{
 			new_size = old_size;
+			break;
+		}
 	}
 	while (ospfs_size2nblocks(oi->oi_size) > ospfs_size2nblocks(new_size)) {
 	        /* EXERCISE: Your code here  In Progress */
