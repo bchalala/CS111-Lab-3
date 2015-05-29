@@ -595,15 +595,15 @@ allocate_block(void)
 	/* EXERCISE: Your code here */
     
     // First finds the size of the bitmap.
-    int num_bitmap_blocks = ospfs_super->os_nblocks / 8192;
+    int num_bitmap_blocks = ospfs_super->os_firstinob - 2; 
     
     int block = 0;
     uint32_t *block_ptr = ospfs_block(2);
 
-    // Current bit is te first free block
-    int current_bit = 2 + num_bitmap_blocks;
+    // Current bit is the first free block
+    int current_bit = os_firstinob;
 
-    while (block <= num_bitmap_blocks)
+    while (block < num_bitmap_blocks)
     {
         // Test the current bitvector. If 1, set it and return block number 
         if (bitvector_test(block_ptr, current_bit))
@@ -621,7 +621,6 @@ allocate_block(void)
             current_bit = 0;
         }
     }
-
 	return 0;
 }
 
@@ -643,10 +642,10 @@ free_block(uint32_t blockno)
 	/* EXERCISE: Your code here */
     
     // Gets the number of blocks for the free block bitmap 
-    int num_bitmap_blocks = ospfs_super->os_nblocks / 8192;
+    int num_bitmap_blocks = ospfs_super->os_firstinob - 2;
 
     // If it is trying to free a reserved block, it exits.
-    if (blockno > 0 && blockno < 2 + num_bitmap_blocks)
+    if ((blockno > 0 && blockno <= 2 + num_bitmap_blocks) || blockno >= OSPFS_MAXFILEBLKS)
     {
         return;
     }
@@ -694,7 +693,11 @@ free_block(uint32_t blockno)
 static int32_t
 indir2_index(uint32_t b)
 {
-	// Your code here.
+	// Your code here. DONE
+
+	if (OSPFS_NDIRECT + OSPFS_NINDIRECT <= b && b < OSPFS_MAXFILEBLKS)
+		return 0;
+
 	return -1;
 }
 
@@ -713,7 +716,11 @@ indir2_index(uint32_t b)
 static int32_t
 indir_index(uint32_t b)
 {
-	// Your code here.
+	// Your code here. DONE
+
+	if (OSPFS_NDIRECT <= b && b < OSPFS_NDIRECT + OSPFS_NINDIRECT)
+		return 0;
+
 	return -1;
 }
 
@@ -730,7 +737,11 @@ indir_index(uint32_t b)
 static int32_t
 direct_index(uint32_t b)
 {
-	// Your code here.
+	// Your code here. DONE
+
+	if (b < OSPFS_NDIRECT)
+		return 0;
+
 	return -1;
 }
 
