@@ -744,7 +744,7 @@ indir_index(uint32_t b)
 static int32_t
 direct_index(uint32_t b)
 {
-	// Your code here. In Progress
+	// Your code here. DONE
 
 	if (b < OSPFS_NDIRECT)
 		return b;
@@ -755,8 +755,6 @@ direct_index(uint32_t b)
 		b %= OSPFS_NINDIRECT;
 		return b;
 	}
-
-	return -1;
 }
 
 
