@@ -1171,7 +1171,7 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
         }
 
         // Then the data of size n is copied from the block
-        if (copy_to_user(buffer, data, n > 0))
+        if (copy_to_user(buffer, data, n) > 0)
         {
                 retval = -EFAULT;
                 goto done;
