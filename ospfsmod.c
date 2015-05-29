@@ -484,7 +484,7 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		/* EXERCISE: Your code here */
         
         // Gets the OSPFS inode at the current offset.
-        ospfs_direntry_t cur_entry = ospfs_inode_data(dir_oi, cur_offset);
+        ospfs_direntry_t *cur_entry = ospfs_inode_data(dir_oi, cur_offset);
         if (cur_entry->od_ino > 0)
         {
             // Gets the length of the name
@@ -601,7 +601,7 @@ allocate_block(void)
     uint32_t *block_ptr = ospfs_block(2);
 
     // Current bit is the first free block
-    int current_bit = os_firstinob;
+    int current_bit = ospfs_super->os_firstinob;
 
     while (block < num_bitmap_blocks)
     {
@@ -1449,7 +1449,7 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	// new file into directory entry
 	dir_ent->od_ino = i;
 	memcpy(dir_ent->od_name, dentry->d_name.name, dentry->d_name.len);
-	dir_ent->od_nmae[dentry->d_name.len] = '\0';
+	dir_ent->od_name[dentry->d_name.len] = '\0';
 
 	// set the inode parameters
 	ospfs_inode_t* newnode = ospfs_inode(i);
