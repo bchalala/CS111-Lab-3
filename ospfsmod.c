@@ -452,8 +452,14 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 * the loop.  For now we do this all the time.
 		 *
 		 * EXERCISE: Your code here */
-		r = 1;		/* Fix me! */
-		break;		/* Fix me! */
+
+        // Gets the current offset for the file
+        int cur_offset = (f_pos - 2) * OSPFS_DIRENTRY_SIZE;
+        if (cur_offset >= dir_oi->oi_size)
+        {
+            r = 1;
+            break;
+        }
 
 		/* Get a pointer to the next entry (od) in the directory.
 		 * The file system interprets the contents of a
@@ -476,6 +482,40 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 */
 
 		/* EXERCISE: Your code here */
+        
+        // Gets the OSPFS inode at the current offset.
+        ospfs_direntry_t cur_entry = ospfs_inode_data(dir_oi, cur_offset);
+        if (cur_entry->od_ino > 0)
+        {
+            // Gets the length of the name
+            int name_len = strlen(cur_entry->od_name);
+
+            // Find the FTYPE of the file. Has to load its inode.
+            ospfs_inode_t *cur_oi = ospfs_inode(cur_entry->od_ino);
+            
+            // Chooses appropriate function based on the FTYPE
+            switch (cur_oi->oi_ftype)
+            {
+                case 0:
+                    ok_so_far = filldir(dirent, cur_entry->od_name, f_pos, cur_entry->od_ino, DT_REG);
+                    break;
+               
+                case 1:
+                    ok_so_far = filldir(dirent, cur_entry->od_name, f_pos, cur_entry->od_ino, DT_DIR);
+                    break;
+
+                case 2:
+                    ok_so_far = filldir(dirent, cur_entry->od_name, f_pos, cur_entry->od_ino, DT_LNK);
+                    break;
+
+                default:
+                    break;
+            }
+
+        }
+
+        // Increments the position. 
+        f_pos++;
 	}
 
 	// Save the file position and return!
@@ -553,6 +593,35 @@ static uint32_t
 allocate_block(void)
 {
 	/* EXERCISE: Your code here */
+    
+    // First finds the size of the bitmap.
+    int num_bitmap_blocks = ospfs_super->os_nblocks / 8192;
+    
+    int block = 0;
+    uint32_t *block_ptr = ospfs_block(2);
+
+    // Current bit is te first free block
+    int current_bit = 2 + num_bitmap_blocks;
+
+    while (block <= num_bitmap_blocks)
+    {
+        // Test the current bitvector. If 1, set it and return block number 
+        if (bitvector_test(block_ptr, current_bit))
+        {
+            bitvector_clear(block_ptr, current_bit);
+            return current_bit + 8192*block;
+        }
+
+        // Increment the current bit; if its 8192, sets it to 0 and increments block.
+        current_bit++;
+        if (current_bit == 8192)
+        {
+            block++;
+            block_ptr = ospfs_block(2 + block);
+            current_bit = 0;
+        }
+    }
+
 	return 0;
 }
 
@@ -572,6 +641,24 @@ static void
 free_block(uint32_t blockno)
 {
 	/* EXERCISE: Your code here */
+    
+    // Gets the number of blocks for the free block bitmap 
+    int num_bitmap_blocks = ospfs_super->os_nblocks / 8192;
+
+    // If it is trying to free a reserved block, it exits.
+    if (blockno > 0 && blockno < 2 + num_bitmap_blocks)
+    {
+        return;
+    }
+
+    // Gets the bitmap_block that the block is mapped on
+    int bitmap_block = blockno / 8192;
+    int bitmap_pos = blockno % 8192;
+
+    // Sets the bitmap_pos at the bitmap_block to 1. 
+    uint32_t *block_ptr = ospfs_block(2 + bitmap_block);
+    bitvector_set(block_ptr, bitmap_pos);
+
 }
 
 
@@ -845,6 +932,20 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 	// Make sure we don't read past the end of the file!
 	// Change 'count' so we never read past the end of the file.
 	/* EXERCISE: Your code here */
+    
+    // If the file position is further than the size, return an error
+    // POSSIBLE THAT THE COUNT IS 0, WATCH OUT FOR THIS. 
+    if (*f_pos > oi->oi_size)
+    {
+        retval = -EIO;
+        goto done;
+    }
+
+    // If count is larger than the size, reset count.
+    if (count > oi->oi_size - *f_pos)
+    {
+        count = oi->oi_size - *f_pos;
+    }
 
 	// Copy the data to user block by block
 	while (amount < count && retval >= 0) {
@@ -865,10 +966,25 @@ ospfs_read(struct file *filp, char __user *buffer, size_t count, loff_t *f_pos)
 		// into user space.
 		// Use variable 'n' to track number of bytes moved.
 		/* EXERCISE: Your code here */
-		retval = -EIO; // Replace these lines
-		goto done;
+        
+        // n is the size of the data in the block unless:
+        // The position is in the middle of a block, then its the remaining amount
+        // or
+        // The remaining amount is less than the size of the block remaining
+        n = OSPFS_BLKSIZE - (*f_pos) % OSPFS_BLKSIZE;
+        if (n > count - amount)
+        {
+            n = count - amount;  
+        }
 
-		buffer += n;
+        // Then the data of size n is copied from the block
+        if (copy_to_user(buffer, data, n > 0))
+        {
+                retval = -EFAULT;
+                goto done;
+        }
+
+        buffer += n;
 		amount += n;
 		*f_pos += n;
 	}
