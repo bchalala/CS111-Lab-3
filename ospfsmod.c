@@ -608,6 +608,10 @@ static int32_t
 indir2_index(uint32_t b)
 {
 	// Your code here.
+
+	if (OSPFS_NDIRECT + OSPFS_NINDIRECT <= b && b < OSPFS_MAXFILEBLKS)
+		return 0;
+
 	return -1;
 }
 
@@ -627,6 +631,10 @@ static int32_t
 indir_index(uint32_t b)
 {
 	// Your code here.
+
+	if (OSPFS_NDIRECT <= b && b < OSPFS_NDIRECT + OSPFS_NINDIRECT)
+		return 0;
+
 	return -1;
 }
 
@@ -644,6 +652,10 @@ static int32_t
 direct_index(uint32_t b)
 {
 	// Your code here.
+
+	if (b < OSPFS_NDIRECT)
+		return 0;
+
 	return -1;
 }
 
