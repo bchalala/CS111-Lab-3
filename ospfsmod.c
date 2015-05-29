@@ -718,10 +718,17 @@ indir_index(uint32_t b)
 {
 	// Your code here. DONE
 
-	if (OSPFS_NDIRECT <= b && b < OSPFS_NDIRECT + OSPFS_NINDIRECT)
-		return 0;
+	if (b < OSPFS_NDIRECT)
+		return -1;
 
-	return -1;
+	if (b < OSPFS_NDIRECT + OSPFS_NINDIRECT)
+		return 0;
+	else	// b is within doubly indirect block
+	{
+		b -= OSPFS_NDIRECT + OSPFS_NINDIRECT;
+		b /= OSPFS_NINDIRECT;
+		return b;
+	}
 }
 
 
@@ -737,10 +744,17 @@ indir_index(uint32_t b)
 static int32_t
 direct_index(uint32_t b)
 {
-	// Your code here. DONE
+	// Your code here. In Progress
 
 	if (b < OSPFS_NDIRECT)
-		return 0;
+		return b;
+
+	if (b < OSPFS_NDIRECT + OSPFS_NINDIRECT)
+	{
+		b -= OSPFS_NDIRECT;
+		b %= OSPFS_NINDIRECT;
+		return b;
+	}
 
 	return -1;
 }
