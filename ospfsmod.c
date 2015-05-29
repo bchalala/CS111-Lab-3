@@ -552,7 +552,23 @@ ospfs_unlink(struct inode *dirino, struct dentry *dentry)
 static uint32_t
 allocate_block(void)
 {
-	/* EXERCISE: Your code here */
+	/* EXERCISE: Your code here  DONE */
+
+	uint32_t first_inode = ospfs_super->os_firstinob; // this is X
+	uint32_t numblocks = ospfs_super->os_nblocks; // # of blocks on disk
+
+	void* bitmap = ospfs_block(OSPFS_FREEMAP_BLK);
+
+	int i;
+	for (i = first_inode; i < numblocks; i++)
+	{	// 1 if free 0 if used
+		if (bitvector_test(bitmap, i) == 1)
+		{
+			bitvector_clear(bitmap, i); // set to 0 for used
+			return i;
+		}
+	}
+
 	return 0;
 }
 
@@ -571,7 +587,18 @@ allocate_block(void)
 static void
 free_block(uint32_t blockno)
 {
-	/* EXERCISE: Your code here */
+	/* EXERCISE: Your code here  DONE */
+	uint32_t first_inode = ospfs_super->os_firstinob; // X
+
+	if (blockno < first_inode || blockno >= OSPFS_MAXFILEBLKS) 
+	{	// 0, 1, or bitmap blocks || blocks out or range
+		eprintk ("a reserved block/block out of range cannot be freed");
+		return;
+	}
+
+	void* bitmap = ospfs_block(OSPFS_FREEMAP_BLK);
+
+	bitvector_set(bitmap, blockno);	// set to 1 for free
 }
 
 
@@ -607,7 +634,7 @@ free_block(uint32_t blockno)
 static int32_t
 indir2_index(uint32_t b)
 {
-	// Your code here.
+	// Your code here. DONE
 
 	if (OSPFS_NDIRECT + OSPFS_NINDIRECT <= b && b < OSPFS_MAXFILEBLKS)
 		return 0;
@@ -630,7 +657,7 @@ indir2_index(uint32_t b)
 static int32_t
 indir_index(uint32_t b)
 {
-	// Your code here.
+	// Your code here. DONE
 
 	if (OSPFS_NDIRECT <= b && b < OSPFS_NDIRECT + OSPFS_NINDIRECT)
 		return 0;
@@ -651,7 +678,7 @@ indir_index(uint32_t b)
 static int32_t
 direct_index(uint32_t b)
 {
-	// Your code here.
+	// Your code here. DONE
 
 	if (b < OSPFS_NDIRECT)
 		return 0;
