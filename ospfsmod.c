@@ -454,7 +454,7 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 * EXERCISE: Your code here */
 
         // Gets the current offset for the file
-        int cur_offset = (f_pos - 2) * OSPFS_DIRENTRY_SIZE;
+        uint32_t cur_offset = (f_pos - 2) * OSPFS_DIRENTRY_SIZE;
         if (cur_offset >= dir_oi->oi_size)
         {
             r = 1;
@@ -497,15 +497,15 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
             switch (cur_oi->oi_ftype)
             {
                 case 0:
-                    ok_so_far = filldir(dirent, cur_entry->od_name, f_pos, cur_entry->od_ino, DT_REG);
+                    ok_so_far = filldir(dirent, cur_entry->od_name, name_len, f_pos, cur_entry->od_ino, DT_REG);
                     break;
                
                 case 1:
-                    ok_so_far = filldir(dirent, cur_entry->od_name, f_pos, cur_entry->od_ino, DT_DIR);
+                    ok_so_far = filldir(dirent, cur_entry->od_name, name_len, f_pos, cur_entry->od_ino, DT_DIR);
                     break;
 
                 case 2:
-                    ok_so_far = filldir(dirent, cur_entry->od_name, f_pos, cur_entry->od_ino, DT_LNK);
+                    ok_so_far = filldir(dirent, cur_entry->od_name, name_len, f_pos, cur_entry->od_ino, DT_LNK);
                     break;
 
                 default:
