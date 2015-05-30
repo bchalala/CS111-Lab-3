@@ -1542,13 +1542,13 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	if (dentry->d_name.len > OSPFS_MAXNAMELEN || strlen(symname) > OSPFS_MAXSYMLINKLEN)
 		return -ENAMETOOLONG;
 
-	if (find_direnty(dir_oi, dentry->d_name.name. dentry->d_name.len)
+	if (find_direntry(dir_oi, dentry->d_name.name, dentry->d_name.len))
 		return -EEXIST;
 
 	ospfs_direntry_t* dir_ent = create_blank_direntry(dir_oi);
 
 	if (IS_ERR(dir_ent))
-		return PTR_ERR(dir_ent);
+		return PTR_ERR(dir_ent); // -ENOSPC or -EIO
 
 	int i;
 	for (i = ospfs_super->os_firstinob; i < ospfs_super->os_ninodes; i++)
@@ -1568,8 +1568,17 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	//not null terminate so manually set it
 	dir_ent->od_name[dentry->d_name.len] = '\0';
 
-	
+	ospfs_symlink_inode_t* newnode = (ospfs_symlink_inode_t*) ospfs_inode(dir_ent->od_ino);
+	if (!newnode)
+		return -EIO;
 
+	// set the newnode as the symlink
+	newnode->oi_ftype = OSPFS_FTYPE_SYMLINK;
+	newnode->oi_size = strlen(symname);
+	newnode->oi_nlink = 1;
+	memcpy(newnode->oi_symlink, symname, strlen(symname));
+	
+	entry_ino = dir_ent->od_ino;
 	/* Execute this code after your function has successfully created the
 	   file.  Set entry_ino to the created file's inode number before
 	   getting here. */
