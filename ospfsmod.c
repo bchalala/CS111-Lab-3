@@ -1434,7 +1434,7 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	if (IS_ERR(dir_ent))
 		return PTR_ERR(dir_ent);
 
-	// finding fee inode
+	// finding free inode
 
 	int i;
 
@@ -1457,7 +1457,7 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	// set the inode parameters
 	ospfs_inode_t* newnode = ospfs_inode(i);
 	newnode->oi_size = 0;
-	newnode->oi_nlink = 0;
+	newnode->oi_nlink = 1;
 	newnode->oi_indirect = 0;
 	newnode->oi_indirect2 = 0;
 	newnode->oi_ftype = OSPFS_FTYPE_REG;
