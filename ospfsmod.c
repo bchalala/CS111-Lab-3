@@ -561,6 +561,10 @@ ospfs_unlink(struct inode *dirino, struct dentry *dentry)
 
 	od->od_ino = 0;
 	oi->oi_nlink--;
+
+	if (oi->oi_ftype == OSPFS_FTYPE_SYMLINK && oi->oi_nlink == 0)
+		change_size(oi, 0);
+
 	return 0;
 }
 
@@ -1401,6 +1405,7 @@ ospfs_link(struct dentry *src_dentry, struct inode *dir, struct dentry *dst_dent
 
 	dir_ent->od_ino = src_dentry->d_inode->i_ino;
 
+	//the inode pointed by the hard link
 	ospfs_inode_t* the_inode = ospfs_inode(dir_ent->od_ino);
 	if (!the_inode)
 		return -EIO;
@@ -1545,11 +1550,6 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	if (find_direntry(dir_oi, dentry->d_name.name, dentry->d_name.len))
 		return -EEXIST;
 
-	ospfs_direntry_t* dir_ent = create_blank_direntry(dir_oi);
-
-	if (IS_ERR(dir_ent))
-		return PTR_ERR(dir_ent); // -ENOSPC or -EIO
-
 	int i;
 	for (i = ospfs_super->os_firstinob; i < ospfs_super->os_ninodes; i++)
 	{
@@ -1561,16 +1561,21 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	// no free inode
 	if (i >= ospfs_super->os_ninodes)
 		return -ENOSPC;
-	
+
+	ospfs_symlink_inode_t* newnode = (ospfs_symlink_inode_t*) ospfs_inode(i);
+	if (!newnode)
+		return -EIO;
+
+	ospfs_direntry_t* dir_ent = create_blank_direntry(dir_oi);
+
+	if (IS_ERR(dir_ent))
+		return PTR_ERR(dir_ent); // -ENOSPC or -EIO
+
 	// new file into directory entry
 	dir_ent->od_ino = i;
 	memcpy(dir_ent->od_name, dentry->d_name.name, dentry->d_name.len);
 	//not null terminate so manually set it
 	dir_ent->od_name[dentry->d_name.len] = '\0';
-
-	ospfs_symlink_inode_t* newnode = (ospfs_symlink_inode_t*) ospfs_inode(dir_ent->od_ino);
-	if (!newnode)
-		return -EIO;
 
 	// set the newnode as the symlink
 	newnode->oi_ftype = OSPFS_FTYPE_SYMLINK;
