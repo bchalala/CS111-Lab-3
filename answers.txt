@@ -24,3 +24,12 @@ Email: chwl3@ucla.edu
 #Extra credit problem: none
 
 # Add any other information you'd like us to know below this line.
+For the conditional symlink, using the example
+
+echo "not root" > notroot
+echo "root" > root
+ln -s root?root:notroot amiroot
+
+"cat amiroot" cannot find the file or directory even though
+"readlink -f amiroot" shows the proper path to the file
+"su user -c "cat amiroot"" works properly though.
