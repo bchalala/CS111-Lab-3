@@ -1616,8 +1616,28 @@ ospfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 	ospfs_symlink_inode_t *oi =
 		(ospfs_symlink_inode_t *) ospfs_inode(dentry->d_inode->i_ino);
 	// Exercise: Your code here.
+		
+	
+	char* ques = strpbrk(oi->oi_symlink, "?");
+	char* col = strpbrk(oi->oi_symlink, ":");
 
-	nd_set_link(nd, oi->oi_symlink);
+	if (ques && col)
+	{
+		if (!current->uid) // root
+		{
+			//*col = '\0';
+			char newpath[col-ques];
+			memcpy(newpath, ques+1, col-ques-1);
+			newpath[col-ques-1] = '\0';
+
+			nd_set_link(nd, newpath); //newpath
+		}
+		else
+			nd_set_link(nd, col + 1);
+	} 
+	else 	// regular symlink
+		nd_set_link(nd, oi->oi_symlink);
+
 	return (void *) 0;
 }
 
