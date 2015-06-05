@@ -37,7 +37,7 @@ extern uint8_t ospfs_data[];
 extern uint32_t ospfs_length;
 
 // The number of writes until writes will not occur. DESIGN PROBLEM
-int nwrites_to_crash
+int nwrites_to_crash;
 
 // A pointer to the superblock; see ospfs.h for details on the struct.
 static ospfs_super_t * const ospfs_super =
@@ -307,6 +307,9 @@ ospfs_fill_super(struct super_block *sb, void *data, int flags)
 		sb->s_dev = 0;
 		return -ENOMEM;
 	}
+    
+    // Sets the nwrites to -1 initially. 
+    nwrites_to_crash = -1;
 
 	return 0;
 }
@@ -1653,11 +1656,20 @@ int ospfs_ioctl(struct inode *inode, struct file *filp,
 {
     if (cmd == OSPFS_IOC_SETWRITES)
     {
-            
+        int i = arg;
+        if (arg >= 0)
+        {
+            nwrites_to_crash = i;
+        }        
+        else if (arg < 0)
+        {
+            nwrites_to_crash = -1;
+        }
+        return i;
     }
     else if(cmd == OSPRS_IOC_GETWRITES)
     {
-
+        return nwrites_to_crash;
     }
     
     return 0;
@@ -1730,6 +1742,6 @@ module_init(init_ospfs_fs)
 module_exit(exit_ospfs_fs)
 
 // Information about the module
-MODULE_AUTHOR("Skeletor");
+MODULE_AUTHOR("Skeletor, Brett Chalabian, and Chul Hee Woo");
 MODULE_DESCRIPTION("OSPFS");
 MODULE_LICENSE("GPL");

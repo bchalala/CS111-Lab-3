@@ -19,6 +19,7 @@
  * IOCTL CONSTANTS AND DEFINITIONS
  *
  *****************************************************************************/
+#include <linux/ioctl.h>
 
 #define MAJOR_NUM 222                               // Same as Lab2 MAJOR_NUM
 
