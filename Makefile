@@ -55,6 +55,9 @@ fsimgtoc: fsimgtoc.c
 truncate: truncate.c
 	$(CC) $< -o $@
 
+crashtest: crashtest.c
+	$(CC) $< -o $@
+
 DISTDIR := lab3-$(USER)
 ifeq ($(SOL),1)
 DISTDIR := sol3

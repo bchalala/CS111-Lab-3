@@ -15,6 +15,8 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 
+#include "ospfsioctl.h"
+
 /****************************************************************************
  * ospfsmod
  *
@@ -1667,7 +1669,7 @@ int ospfs_ioctl(struct inode *inode, struct file *filp,
         }
         return i;
     }
-    else if(cmd == OSPRS_IOC_GETWRITES)
+    else if(cmd == OSPFS_IOC_GETWRITES)
     {
         return nwrites_to_crash;
     }
