@@ -36,6 +36,9 @@
 extern uint8_t ospfs_data[];
 extern uint32_t ospfs_length;
 
+// The number of writes until writes will not occur. DESIGN PROBLEM
+int nwrites_to_crash
+
 // A pointer to the superblock; see ospfs.h for details on the struct.
 static ospfs_super_t * const ospfs_super =
 	(ospfs_super_t *) &ospfs_data[OSPFS_BLKSIZE];
@@ -1641,6 +1644,25 @@ ospfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 	return (void *) 0;
 }
 
+// This gets called by ioctl. 
+//
+// cmd = IOCTL_SET_NWRITES
+// Sets the number of allowable writes before it simulates a crash. 
+int ospfs_ioctl(struct inode *inode, struct file *filp,
+                unsigned int cmd, unsigned long arg)
+{
+    if (cmd == OSPFS_IOC_SETWRITES)
+    {
+            
+    }
+    else if(cmd == OSPRS_IOC_GETWRITES)
+    {
+
+    }
+    
+    return 0;
+}
+
 
 // Define the file system operations structures mentioned above.
 
@@ -1658,7 +1680,10 @@ static struct inode_operations ospfs_reg_inode_ops = {
 static struct file_operations ospfs_reg_file_ops = {
 	.llseek		= generic_file_llseek,
 	.read		= ospfs_read,
-	.write		= ospfs_write
+	.write		= ospfs_write,
+
+     // Pointer to ioctl function. Used for DESIGN PROBLEM 
+    .ioctl      = ospfs_ioctl
 };
 
 static struct inode_operations ospfs_dir_inode_ops = {
