@@ -16,27 +16,28 @@ int main(int argc, char **argv)
 {
 
     // Opens the file to get its file descriptor. 
-	const char filename[] = "base/crashfile";
+    const char filename[] = "test/crashfile";
     int fd = open(filename, O_RDWR | O_CREAT);
+    int nwrites; 
 
     // If there is no argument called with the function, returns nwrites_to_crash
     if (argc == 1)
     {
-        ioctl(
+        ioctl(fd, OSPFS_IOC_GETWRITES, NULL);
     } 
-
-
-	if (argc != 3)
-	{
-		printf("Usage: %s <filename> <desired_length>\n", argv[0]);
-		printf("Calls truncate(filename, desired_length).\n");
-		exit(1);
-	}
-
-	filename = argv[1];
-	trunced_len = atoi(argv[2]);
     
-    
+    else if (argc == 2)
+    {
+        nwrites = atoi(argv[1]);
+        ioctl(fd, OSPFS_IOC_SETWRITES, nwrites);
+    }
+   
+    else
+    {
+        printf("Usage: %s [nwrites_to_crash value]", argv[0]);
+        printf("Calls ospfs_ioctl in OSPFS file system.\n");
+        exit(1);
+    }
 
-	return 0;
+    return 0;
 }
