@@ -15,6 +15,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 
+// Header to perform ioctl operations.
 #include "ospfsioctl.h"
 
 /****************************************************************************
@@ -532,9 +533,7 @@ ospfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	return r;
 }
 
-
-// ospfs_unlink(dirino, dentry)
-//   This function is called to remove a file.
+// ospfs_unlink(dirino, dentry) //   This function is called to remove a file.
 //
 //   Inputs: dirino  -- You may ignore this.
 //           dentry  -- The 'struct dentry' structure, which contains the inode
@@ -567,13 +566,16 @@ ospfs_unlink(struct inode *dirino, struct dentry *dentry)
 		printk("<1>ospfs_unlink should not fail!\n");
 		return -ENOENT;
 	}
+   
+    // The node is only modified if the nwrites_to_crash > 0 or -1. INODE MODIFIED. 
+    if (change_nwrites())
+    {
+        od->od_ino = 0;
+        oi->oi_nlink--;
 
-	od->od_ino = 0;
-	oi->oi_nlink--;
-
-	if (oi->oi_ftype == OSPFS_FTYPE_SYMLINK && oi->oi_nlink == 0)
+        if (oi->oi_ftype == OSPFS_FTYPE_SYMLINK && oi->oi_nlink == 0)
 		change_size(oi, 0);
-
+    }
 	return 0;
 }
 
@@ -1240,6 +1242,8 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 	if (newsize >= oi->oi_size)
 		if (change_size(oi, newsize) < 0)
 			goto done;
+    
+    int prev_block = 0;
 
 	// Copy data block by block
 	while (amount < count && retval >= 0) {
@@ -1251,7 +1255,7 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 			retval = -EIO;
 			goto done;
 		}
-
+        
 		data = ospfs_block(blockno);
 
 		// Figure out how much data is left in this block to write.
@@ -1267,8 +1271,22 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 		if (n > (count - amount))
 			n = count - amount;
 
-		if (copy_from_user(data + offset, buffer, n) != 0)
-			return -EFAULT;		
+        int block_change = 0;
+
+        // This checks if the block has changed, if it has, it decrements
+        // the writes because it is a write to a new block.
+        if (prev_block != blockno)
+        {
+            prev_block = blockno;
+            block_change = 1;
+            change_nwrites();
+        }
+
+        if (nwrites_to_disk != 0)
+        {
+            if (copy_from_user(data + offset, buffer, n) != 0)
+                return -EFAULT;		
+        }
 
 		buffer += n;
 		amount += n;
