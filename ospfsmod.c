@@ -567,10 +567,13 @@ ospfs_unlink(struct inode *dirino, struct dentry *dentry)
 		return -ENOENT;
 	}
    
-    // The node is only modified if the nwrites_to_crash > 0 or -1. INODE MODIFIED. 
-    if (change_nwrites())
-    {
+    // The node is only modified if the nwrites_to_crash > 0 or -1. Write to d.e. block. 
+    if (!change_nwrites())
         od->od_ino = 0;
+
+    // The node is only modified if the nwrites_to_crash > 0 or -1. Write to inode block. 
+    if (!change_nwrites())
+    {
         oi->oi_nlink--;
 
         if (oi->oi_ftype == OSPFS_FTYPE_SYMLINK && oi->oi_nlink == 0)
@@ -815,40 +818,58 @@ add_block(ospfs_inode_t *oi)
 	uint32_t *allocated[2] = { 0, 0 };
 
 	/* EXERCISE: Your code here  DONE*/
+    int bitmapwrite = change_nwrites();
+    int inodewrite = change_nwrites();
+
 
 	if (n >= OSPFS_MAXFILEBLKS)
 		return -ENOSPC;
 
-	allocated[0] = allocate_block();
-	if (allocated[0] == 0)
-		return -ENOSPC;
-   
+    if (!bitmapwrite)
+    {
+        allocated[0] = allocate_block();
+        if (allocated[0] == 0)
+            return -ENOSPC;
+    } 
+    
+
     memset(ospfs_block(allocated[0]), 0, OSPFS_BLKSIZE); // zero out the block
 
 	if (indir2_index(n) == -1) // doesn't need doubly
 	{
 		if (indir_index(n) == -1)	// doesn't need indirect
-		{	
-			oi->oi_direct[n] = allocated[0];
-			oi->oi_size += OSPFS_BLKSIZE; 
-			return 0;
+		{
+            if (!inodewrite)
+            {    
+			    oi->oi_direct[n] = allocated[0];
+                oi->oi_size += OSPFS_BLKSIZE; 
+                return 0;
+            }
 		}
 		else if (indir_index(n) == 0) // requires an indirect
 		{
 			if (n == OSPFS_NDIRECT) // oi indirect not yet created
 			{
-				oi->oi_indirect = allocated[0]; // we already know this is good
+
+                if (!inodewrite)
+				    oi->oi_indirect = allocated[0]; // we already know this is good
 				
 				uint32_t *indir = ospfs_block(oi->oi_indirect);
-				
-				if (!(indir[0] = allocate_block()))
-				{
-					free_block(allocated[0]);
-					return -ENOSPC;
-				}
+                
+                if (!bitmapwrite)
+                {                
+				    if (!(indir[0] = allocate_block()))
+				    {
+					    free_block(allocated[0]);
+					    return -ENOSPC;
+				    }
+                }
+                
+                if (!change_nwrites())
+				    memset(ospfs_block(indir[0]), 0, OSPFS_BLKSIZE);
 
-				memset(ospfs_block(indir[0]), 0, OSPFS_BLKSIZE);
-				oi->oi_size += OSPFS_BLKSIZE; /*****/
+                if (!inodewrite)
+				    oi->oi_size += OSPFS_BLKSIZE; /*****/
 				return 0;
 			}
 
@@ -857,13 +878,15 @@ add_block(ospfs_inode_t *oi)
 			uint32_t indir_num = direct_index(n);
 			
 			indir_arr[indir_num] = allocated[0];
-
-			oi->oi_size += OSPFS_BLKSIZE; /******/
+            if (!inodewrite)
+			    oi->oi_size += OSPFS_BLKSIZE; /******/
 			return 0;
 		}
 		else
-		{	// shouldn't get here. something went wrong
-			free_block(allocated[0]);
+		{	
+            // shouldn't get here. something went wrong
+			if (!bitmapwrite)
+                free_block(allocated[0]);
 			return -EIO;
 		}
 	}
@@ -871,44 +894,59 @@ add_block(ospfs_inode_t *oi)
 	{
 		if (n == OSPFS_NDIRECT + OSPFS_NINDIRECT)
 		{	// oi indir2 not yet created. oi indirect just filled up
-			oi->oi_indirect2 = allocated[0];
+            if (!inodewrite)
+			    oi->oi_indirect2 = allocated[0];
 		}
 		
 		// oi indir2 exists at this point
 		uint32_t* ind2_arr = ospfs_block(oi->oi_indirect2);
 		uint32_t ind2_num = indir_index(n);
+        
 
 		uint32_t ind_num = (n - OSPFS_NDIRECT) % OSPFS_NINDIRECT;
-
+        
 		if (ind_num == 0)
-		{	// need new indirect block
-			if (!(allocated[1] = allocate_block()))
-			{
-				free_block(allocated[0]);
-				return -ENOSPC;
-			}
+		{	
+            if (!bitmapwrite)
+            {
+                // need new indirect block
+                if (!(allocated[1] = allocate_block()))
+                {
+                    free_block(allocated[0]);
+                    return -ENOSPC;
+                }
+            }
+            
+            if (!change_nwrites())
+                memset(ospfs_block(allocated[1]), 0, OSPFS_BLKSIZE);
+            ind2_arr[ind2_num] = allocated[1];
+        }
 
-			memset(ospfs_block(allocated[1]), 0, OSPFS_BLKSIZE);
-			ind2_arr[ind2_num] = allocated[1];
-		}
+        uint32_t* ind_arr = ospfs_block(ind2_arr[ind2_num]);
 
-		uint32_t* ind_arr = ospfs_block(ind2_arr[ind2_num]);
+        uint32_t newblock;
+        if (!bitmapwrite)
+            newblock = allocate_block();
 
-		uint32_t newblock = allocate_block();
-		if (newblock == 0)
-		{
-			free_block(allocated[0]);
-			if (allocated[1] != 0)
-				free_block(allocated[1]);
-			return -ENOSPC;
-		}
+        if (newblock == 0)
+        {
+            free_block(allocated[0]);
+            if (allocated[1] != 0)
+                free_block(allocated[1]);
+            return -ENOSPC;
+        }
+        
+        if (!change_nwrites())
+        {
+            memset(ospfs_block(newblock), 0, OSPFS_BLKSIZE);
+        }
 
-		memset(ospfs_block(newblock), 0, OSPFS_BLKSIZE);
-		ind_arr[ind_num] = newblock;
+        ind_arr[ind_num] = newblock;
 
-		oi->oi_size += OSPFS_BLKSIZE;
-		return 0;
-	}
+        if (!inodewrite)        
+            oi->oi_size += OSPFS_BLKSIZE;
+        return 0;
+    }
 }
 
 
@@ -934,7 +972,7 @@ add_block(ospfs_inode_t *oi)
 // you set the block pointer to 0.  Don't leave pointers to
 // deallocated blocks laying around!
 
-static int
+    static int
 remove_block(ospfs_inode_t *oi)
 {
 	// current number of blocks in file
