@@ -14,19 +14,6 @@
 #define OSPFS_BLKSIZE       (1 << OSPFS_BLKSIZE_BITS) /* == 1024 */
 #define OSPFS_BLKBITSIZE    (OSPFS_BLKSIZE * 8)
 
-
-/*****************************************************************************
- * IOCTL CONSTANTS AND DEFINITIONS
- *
- *****************************************************************************/
-#include <linux/ioctl.h>
-
-#define MAJOR_NUM 222                               // Same as Lab2 MAJOR_NUM
-
-// Defines integers using _IO macro. 
-#define OSPFS_IOC_SETWRITES _IO(MAJOR_NUM, 0, int) 
-#define OSPFS_IOC_GETWRITES _IO(MAJOR_NUM, 1)
-
 /*****************************************************************************
  * FILE SYSTEM LAYOUT
  *

@@ -15,6 +15,8 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 
+#include "ospfsioctl.h"
+
 /****************************************************************************
  * ospfsmod
  *
@@ -38,6 +40,7 @@ extern uint32_t ospfs_length;
 
 // The number of writes until writes will not occur. DESIGN PROBLEM
 int nwrites_to_crash;
+void change_nwrites(void);
 
 // A pointer to the superblock; see ospfs.h for details on the struct.
 static ospfs_super_t * const ospfs_super =
@@ -666,6 +669,7 @@ free_block(uint32_t blockno)
 
     // Sets the bitmap_pos at the bitmap_block to 1. 
     uint32_t *block_ptr = ospfs_block(2 + bitmap_block);
+    
     bitvector_set(block_ptr, bitmap_pos);
 
 }
@@ -816,8 +820,8 @@ add_block(ospfs_inode_t *oi)
 	allocated[0] = allocate_block();
 	if (allocated[0] == 0)
 		return -ENOSPC;
-
-	memset(ospfs_block(allocated[0]), 0, OSPFS_BLKSIZE); // zero out the block
+   
+    memset(ospfs_block(allocated[0]), 0, OSPFS_BLKSIZE); // zero out the block
 
 	if (indir2_index(n) == -1) // doesn't need doubly
 	{
@@ -1233,9 +1237,11 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 	/* EXERCISE: Your code here */
 
 	uint32_t newsize = *f_pos + count;
-	if (newsize >= oi->oi_size)
+	if (newsize >= oi->oi_size && !change_nwrites())
 		if (change_size(oi, newsize) < 0)
 			goto done;
+
+    int prev_block = 0;
 
 	// Copy data block by block
 	while (amount < count && retval >= 0) {
@@ -1263,8 +1269,24 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 		if (n > (count - amount))
 			n = count - amount;
 
-		if (copy_from_user(data + offset, buffer, n) != 0)
-			return -EFAULT;		
+
+        int block_change = 0;
+
+        // This checks if the block has changed, if it has, it decrements
+        // the writes because it is a write to a new block.
+        if (prev_block != blockno)
+        {
+            prev_block = blockno;
+            block_change = 1;
+            change_nwrites();
+        }
+
+        if (nwrites_to_disk != 0)
+        {
+            if (copy_from_user(data + offset, buffer, n) != 0)
+                return -EFAULT;        
+        }
+
 
 		buffer += n;
 		amount += n;
@@ -1667,11 +1689,23 @@ int ospfs_ioctl(struct inode *inode, struct file *filp,
         }
         return i;
     }
-    else if(cmd == OSPRS_IOC_GETWRITES)
+    else if(cmd == OSPFS_IOC_GETWRITES)
     {
         return nwrites_to_crash;
     }
     
+    return 0;
+}
+
+int change_nwrites(void)
+{
+    // returns true if nwrites is 0
+    if (nwrites == 0)
+        return 1;
+
+    if (nwrites > 0)
+        nwrites--;
+
     return 0;
 }
 

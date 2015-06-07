@@ -7,10 +7,10 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <stdio.h>
-
-// Used in order to 
 #include <sys/ioctl.h>
-#include "ospfs.h"
+#include <fcntl.h>
+#include "ospfsioctl.h"
+
 
 int main(int argc, char **argv)
 {
@@ -23,7 +23,7 @@ int main(int argc, char **argv)
     // If there is no argument called with the function, returns nwrites_to_crash
     if (argc == 1)
     {
-        ioctl(fd, OSPFS_IOC_GETWRITES, NULL);
+        printf("nwrites: %d\n", ioctl(fd, OSPFS_IOC_GETWRITES, NULL));
     } 
     
     else if (argc == 2)
