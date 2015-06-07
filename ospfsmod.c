@@ -40,7 +40,7 @@ extern uint32_t ospfs_length;
 
 // The number of writes until writes will not occur. DESIGN PROBLEM
 int nwrites_to_crash;
-void change_nwrites(void);
+int change_nwrites(void);
 
 // A pointer to the superblock; see ospfs.h for details on the struct.
 static ospfs_super_t * const ospfs_super =
@@ -1281,7 +1281,7 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
             change_nwrites();
         }
 
-        if (nwrites_to_disk != 0)
+        if (nwrites_to_crash != 0)
         {
             if (copy_from_user(data + offset, buffer, n) != 0)
                 return -EFAULT;        
