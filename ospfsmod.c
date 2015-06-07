@@ -247,7 +247,7 @@ ospfs_mk_linux_inode(struct super_block *sb, ino_t ino)
 {
 	ospfs_inode_t *oi = ospfs_inode(ino);
 	struct inode *inode;
-
+	
 	if (!oi)
 		return 0;
 	if (!(inode = new_inode(sb)))
@@ -303,6 +303,7 @@ ospfs_fill_super(struct super_block *sb, void *data, int flags)
 	sb->s_blocksize_bits = OSPFS_BLKSIZE_BITS;
 	sb->s_magic = OSPFS_MAGIC;
 	sb->s_op = &ospfs_superblock_ops;
+	
 
 	if (!(root_inode = ospfs_mk_linux_inode(sb, OSPFS_ROOT_INO))
 	    || !(sb->s_root = d_alloc_root(root_inode))) {
@@ -312,7 +313,7 @@ ospfs_fill_super(struct super_block *sb, void *data, int flags)
 	}
     
     // Sets the nwrites to -1 initially. 
-    nwrites_to_crash = -1;
+    	nwrites_to_crash = -1;
 
 	return 0;
 }
@@ -568,11 +569,16 @@ ospfs_unlink(struct inode *dirino, struct dentry *dentry)
 		return -ENOENT;
 	}
 
-	od->od_ino = 0;
-	oi->oi_nlink--;
+	if (!change_nwrites())
+		od->od_ino = 0;
+	
+	if (!change_nwrites())
+	{
+		oi->oi_nlink--;
 
-	if (oi->oi_ftype == OSPFS_FTYPE_SYMLINK && oi->oi_nlink == 0)
-		change_size(oi, 0);
+		if (oi->oi_ftype == OSPFS_FTYPE_SYMLINK && oi->oi_nlink == 0)
+			change_size(oi, 0);
+	}
 
 	return 0;
 }
@@ -1377,9 +1383,14 @@ create_blank_direntry(ospfs_inode_t *dir_oi)
 	}
 
 	// step 2
-	int r = change_size(dir_oi, dir_oi->oi_size + OSPFS_BLKSIZE);
-	if (r != 0)
-		return ERR_PTR(r);
+	
+	if (!change_nwrites())
+	{
+		int r = change_size(dir_oi, dir_oi->oi_size + OSPFS_BLKSIZE);
+
+		if (r != 0)
+			return ERR_PTR(r);
+	}
 
 	return ospfs_inode_data(dir_oi, curr);
 }
@@ -1431,19 +1442,27 @@ ospfs_link(struct dentry *src_dentry, struct inode *dir, struct dentry *dst_dent
 	if (IS_ERR(dir_ent))
 		return PTR_ERR(dir_ent); // -ENOSPC or -EIO
 
-	dir_ent->od_ino = src_dentry->d_inode->i_ino;
+	//dir_ent->od_ino = src_dentry->d_inode->i_ino;
 
 	//the inode pointed by the hard link
-	ospfs_inode_t* the_inode = ospfs_inode(dir_ent->od_ino);
+	ospfs_inode_t* the_inode = ospfs_inode(src_dentry->d_inode->i_ino);
 	if (!the_inode)
 		return -EIO;
 
 
-	// no more errors if at this point. update new entry and the link count
-	the_inode->oi_nlink++;
-	memcpy(dir_ent->od_name, dst_dentry->d_name.name, dst_dentry->d_name.len);
-	//not null terminate so manually set it
-	dir_ent->od_name[dst_dentry->d_name.len] = '\0';
+	if (!change_nwrites())
+		// no more errors if at this point. update new entry and the link count
+		the_inode->oi_nlink++;
+
+	
+	if (!change_nwrites())
+	{
+		dir_ent->od_ino = src_dentry->d_inode->i_ino;
+		memcpy(dir_ent->od_name, dst_dentry->d_name.name, dst_dentry->d_name.len);
+
+		//not null terminate so manually set it
+		dir_ent->od_name[dst_dentry->d_name.len] = '\0';
+	}
 	
 	return 0;
 	/* EXERCISE: Your code here.   DONE */
@@ -1511,21 +1530,27 @@ ospfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidat
 	if (i >= ospfs_super->os_ninodes)
 		return -ENOSPC;
 
-	// new file into directory entry
-	dir_ent->od_ino = i;
-	memcpy(dir_ent->od_name, dentry->d_name.name, dentry->d_name.len);
-	//not null terminate so manually set it
-	dir_ent->od_name[dentry->d_name.len] = '\0';
+	if (!change_nwrites())
+	{
+		// new file into directory entry
+		dir_ent->od_ino = i;
+		memcpy(dir_ent->od_name, dentry->d_name.name, dentry->d_name.len);
+		//not null terminate so manually set it
+		dir_ent->od_name[dentry->d_name.len] = '\0';
+	}
 
+	if (!change_nwrites())
+	{
 	// set the inode parameters
-	ospfs_inode_t* newnode = ospfs_inode(i);
-	newnode->oi_size = 0;
-	newnode->oi_nlink = 1;
-	newnode->oi_indirect = 0;
-	newnode->oi_indirect2 = 0;
-	newnode->oi_ftype = OSPFS_FTYPE_REG;
-	newnode->oi_mode = mode;
-	memset(newnode->oi_direct, 0, OSPFS_NDIRECT * sizeof(uint32_t));
+		ospfs_inode_t* newnode = ospfs_inode(i);
+		newnode->oi_size = 0;
+		newnode->oi_nlink = 1;
+		newnode->oi_indirect = 0;
+		newnode->oi_indirect2 = 0;
+		newnode->oi_ftype = OSPFS_FTYPE_REG;
+		newnode->oi_mode = mode;
+		memset(newnode->oi_direct, 0, OSPFS_NDIRECT * sizeof(uint32_t));
+	}
 
 
 	entry_ino = dir_ent->od_ino;
@@ -1599,17 +1624,23 @@ ospfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	if (IS_ERR(dir_ent))
 		return PTR_ERR(dir_ent); // -ENOSPC or -EIO
 
-	// new file into directory entry
-	dir_ent->od_ino = i;
-	memcpy(dir_ent->od_name, dentry->d_name.name, dentry->d_name.len);
-	//not null terminate so manually set it
-	dir_ent->od_name[dentry->d_name.len] = '\0';
+	if (!change_nwrites())
+	{
+		// new file into directory entry
+		dir_ent->od_ino = i;
+		memcpy(dir_ent->od_name, dentry->d_name.name, dentry->d_name.len);
+		//not null terminate so manually set it
+		dir_ent->od_name[dentry->d_name.len] = '\0';
+	}
 
-	// set the newnode as the symlink
-	newnode->oi_ftype = OSPFS_FTYPE_SYMLINK;
-	newnode->oi_size = strlen(symname);
-	newnode->oi_nlink = 1;
-	memcpy(newnode->oi_symlink, symname, strlen(symname));
+	if (!change_nwrites())
+	{
+		// set the newnode as the symlink
+		newnode->oi_ftype = OSPFS_FTYPE_SYMLINK;
+		newnode->oi_size = strlen(symname);
+		newnode->oi_nlink = 1;
+		memcpy(newnode->oi_symlink, symname, strlen(symname));
+	}
 	
 	entry_ino = dir_ent->od_ino;
 	/* Execute this code after your function has successfully created the
