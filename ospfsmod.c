@@ -1700,11 +1700,11 @@ int ospfs_ioctl(struct inode *inode, struct file *filp,
 int change_nwrites(void)
 {
     // returns true if nwrites is 0
-    if (nwrites == 0)
+    if (nwrites_to_crash == 0)
         return 1;
 
-    if (nwrites > 0)
-        nwrites--;
+    if (nwrites_to_crash > 0)
+        nwrites_to_crash--;
 
     return 0;
 }
