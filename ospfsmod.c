@@ -1237,9 +1237,11 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 	/* EXERCISE: Your code here */
 
 	uint32_t newsize = *f_pos + count;
-	if (newsize >= oi->oi_size)
+	if (newsize >= oi->oi_size && !change_nwrites())
 		if (change_size(oi, newsize) < 0)
 			goto done;
+
+    int prev_block = 0;
 
 	// Copy data block by block
 	while (amount < count && retval >= 0) {
@@ -1267,8 +1269,24 @@ ospfs_write(struct file *filp, const char __user *buffer, size_t count, loff_t *
 		if (n > (count - amount))
 			n = count - amount;
 
-		if (copy_from_user(data + offset, buffer, n) != 0)
-			return -EFAULT;		
+
+        int block_change = 0;
+
+        // This checks if the block has changed, if it has, it decrements
+        // the writes because it is a write to a new block.
+        if (prev_block != blockno)
+        {
+            prev_block = blockno;
+            block_change = 1;
+            change_nwrites();
+        }
+
+        if (nwrites_to_disk != 0)
+        {
+            if (copy_from_user(data + offset, buffer, n) != 0)
+                return -EFAULT;        
+        }
+
 
 		buffer += n;
 		amount += n;
